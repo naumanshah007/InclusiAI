@@ -14,10 +14,10 @@ export default function DashboardPage() {
 
       {/* Header */}
       <header
-        className="border-b border-gray-200/50 bg-white/80 backdrop-blur-lg sticky top-0 z-30"
+        className="border-b border-gray-200/50 bg-white/80 backdrop-blur-lg sticky top-0 z-30 relative"
         role="banner"
       >
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <nav
             className="flex items-center justify-between"
             role="navigation"
@@ -29,8 +29,8 @@ export default function DashboardPage() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 bg-gradient-to-br from-gray-50 to-primary-50/30 py-8" role="main">
-        <div className="container mx-auto px-4">
+      <main className="flex-1 bg-gradient-to-br from-gray-50 to-primary-50/30 py-4 sm:py-6 lg:py-8" role="main">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           {/* Profile-Specific Dashboard */}
           <ProfileDashboard />
         </div>

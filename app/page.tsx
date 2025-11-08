@@ -16,36 +16,45 @@ export default function Home() {
         className="border-b border-gray-200/50 bg-white/80 backdrop-blur-lg sticky top-0 z-40"
         role="banner"
       >
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <nav
             className="flex items-center justify-between"
             role="navigation"
             aria-label="Main navigation"
           >
             <BannerLogo />
-            <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-3 sm:gap-4">
               <Link
                 href={ROUTES.LOGIN}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                className="rounded-lg px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 min-h-[44px] flex items-center"
                 aria-label="Sign in"
               >
                 Sign In
               </Link>
               <Link
                 href={ROUTES.DASHBOARD}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                className="rounded-lg px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 min-h-[44px] flex items-center"
                 aria-label="Go to dashboard"
               >
                 Dashboard
               </Link>
               <Link
                 href={ROUTES.SETTINGS}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                className="rounded-lg px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 min-h-[44px] flex items-center"
                 aria-label="Go to settings"
               >
                 Settings
               </Link>
             </div>
+            {/* Mobile menu button */}
+            <button
+              className="sm:hidden rounded-lg p-2 text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label="Menu"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
           </nav>
         </div>
       </header>

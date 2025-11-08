@@ -1426,7 +1426,7 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 p-4 sm:p-6 lg:p-8">
       {/* Camera Preview (hidden but active) */}
       <div className="hidden">
         <video
@@ -1441,10 +1441,10 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
       </div>
 
       {/* Main Interface */}
-      <div className="w-full max-w-2xl space-y-8 text-center">
-        <div className="space-y-4">
-          <h1 className="text-4xl font-bold text-gray-900">Voice Assistant</h1>
-          <p className="text-lg text-gray-700">
+      <div className="w-full max-w-2xl space-y-6 sm:space-y-8 text-center">
+        <div className="space-y-3 sm:space-y-4">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">Voice Assistant</h1>
+          <p className="text-base sm:text-lg text-gray-700 px-4">
             I am your eyes. Ask me anything, and I will help you navigate and understand your surroundings.
           </p>
         </div>
@@ -1453,12 +1453,12 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
         {!isListening && !autoStart ? (
           <button
             onClick={startListening}
-            className="h-48 w-48 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-2xl transition-all hover:scale-110 hover:shadow-3xl focus:outline-none focus:ring-4 focus:ring-blue-300"
+            className="h-32 w-32 sm:h-40 sm:w-40 lg:h-48 lg:w-48 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-2xl transition-all hover:scale-110 active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-300 min-h-[128px] min-w-[128px]"
             aria-label="Start voice assistant"
           >
-            <div className="flex flex-col items-center justify-center gap-4">
+            <div className="flex flex-col items-center justify-center gap-2 sm:gap-4">
               <svg
-                className="h-20 w-20"
+                className="h-12 w-12 sm:h-16 sm:w-16 lg:h-20 lg:w-20"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -1470,26 +1470,26 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
                   d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
                 />
               </svg>
-              <span className="text-2xl font-bold">Start</span>
+              <span className="text-lg sm:text-xl lg:text-2xl font-bold">Start</span>
             </div>
           </button>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Status Indicator */}
-            <div className="flex items-center justify-center gap-4">
-              <div className={`h-6 w-6 rounded-full ${(isListening || autoStart) ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-              <span className="text-xl font-semibold text-gray-900">
+            <div className="flex items-center justify-center gap-3 sm:gap-4">
+              <div className={`h-5 w-5 sm:h-6 sm:w-6 rounded-full ${(isListening || autoStart) ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+              <span className="text-lg sm:text-xl font-semibold text-gray-900">
                 {(isListening || autoStart) ? 'Always Listening...' : 'Stopped'}
               </span>
             </div>
             
             {/* Auto-start indicator */}
             {autoStart && (
-              <div className="rounded-xl border-2 border-blue-500 bg-blue-50 p-4">
-                <p className="text-lg font-semibold text-blue-900">
+              <div className="rounded-xl border-2 border-blue-500 bg-blue-50 p-3 sm:p-4 mx-4 sm:mx-0">
+                <p className="text-base sm:text-lg font-semibold text-blue-900">
                   🎤 Always Listening Mode
                 </p>
-                <p className="text-sm text-blue-700">
+                <p className="text-sm text-blue-700 mt-1">
                   Just speak naturally. I will understand and help you.
                 </p>
               </div>
@@ -1503,13 +1503,13 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
                 console.log('Stop button clicked - stopping everything');
                 stopListening();
               }}
-              className="h-32 w-32 rounded-full bg-gradient-to-br from-red-600 to-red-700 text-white shadow-xl transition-all hover:scale-110 focus:outline-none focus:ring-4 focus:ring-red-300"
+              className="h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 rounded-full bg-gradient-to-br from-red-600 to-red-700 text-white shadow-xl transition-all hover:scale-110 active:scale-95 focus:outline-none focus:ring-4 focus:ring-red-300 min-h-[96px] min-w-[96px]"
               aria-label="Stop voice assistant"
               type="button"
             >
               <div className="flex flex-col items-center justify-center gap-2">
                 <svg
-                  className="h-12 w-12"
+                  className="h-10 w-10 sm:h-12 sm:w-12"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1527,17 +1527,17 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
                     d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
                   />
                 </svg>
-                <span className="text-xl font-bold">Stop</span>
+                <span className="text-base sm:text-lg lg:text-xl font-bold">Stop</span>
               </div>
             </button>
 
             {/* Travel Mode Indicator */}
             {travelModeActive && (
-              <div className="rounded-xl border-2 border-green-500 bg-green-50 p-4">
-                <p className="text-lg font-semibold text-green-900">
+              <div className="rounded-xl border-2 border-green-500 bg-green-50 p-3 sm:p-4 mx-4 sm:mx-0">
+                <p className="text-base sm:text-lg font-semibold text-green-900">
                   🚶 Travel Mode Active
                 </p>
-                <p className="text-sm text-green-700">
+                <p className="text-sm text-green-700 mt-1">
                   Continuously analyzing your surroundings every 8 seconds
                 </p>
                 <p className="text-xs text-green-600 mt-2">
@@ -1548,16 +1548,16 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
 
             {/* Processing Indicator */}
             {isProcessing && (
-              <div className="rounded-xl border border-blue-300 bg-blue-50 p-4">
-                <p className="text-blue-900">Processing your request...</p>
+              <div className="rounded-xl border border-blue-300 bg-blue-50 p-3 sm:p-4 mx-4 sm:mx-0">
+                <p className="text-sm sm:text-base text-blue-900">Processing your request...</p>
               </div>
             )}
 
             {/* Last Response */}
             {lastResponse && !isProcessing && (
-              <div className="rounded-xl border border-gray-200 bg-white p-6 text-left shadow-sm">
-                <h3 className="mb-2 font-semibold text-gray-900">Last Response:</h3>
-                <p className="text-gray-700">{lastResponse}</p>
+              <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 text-left shadow-sm mx-4 sm:mx-0">
+                <h3 className="mb-2 text-base sm:text-lg font-semibold text-gray-900">Last Response:</h3>
+                <p className="text-sm sm:text-base text-gray-700 break-words">{lastResponse}</p>
                 <div className="mt-4">
                   <TextToSpeech text={lastResponse} />
                 </div>
@@ -1568,8 +1568,8 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
 
         {/* Voice Commands Help */}
         {(isListening || autoStart) && (
-          <div className="rounded-xl border border-gray-200 bg-white p-6 text-left">
-            <h3 className="mb-4 font-semibold text-gray-900">Natural Voice Commands:</h3>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 text-left mx-4 sm:mx-0">
+            <h3 className="mb-3 sm:mb-4 text-base sm:text-lg font-semibold text-gray-900">Natural Voice Commands:</h3>
             <ul className="space-y-2 text-sm text-gray-700">
               <li>• "What do you see?" - Describe your surroundings</li>
               <li>• "I am walking" or "I'm walking" - Start navigation assistance</li>
