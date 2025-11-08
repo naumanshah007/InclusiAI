@@ -114,30 +114,36 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
       recognitionInstance.onerror = (event: any) => {
         console.error('Speech recognition error:', event.error);
         if (event.error === 'no-speech') {
-          // Restart listening if no speech detected
-          if (isListening || autoStart) {
-            setTimeout(() => {
-              if (recognitionInstance && (isListening || autoStart)) {
-                try {
-                  recognitionInstance.start();
-                } catch (e) {
-                  // Already started
-                }
+      // Restart listening if no speech detected
+      if (isListening || autoStart) {
+        setTimeout(() => {
+          if (recognitionInstance && (isListening || autoStart) && recognitionInstance.state !== 'running') {
+            try {
+              recognitionInstance.start();
+            } catch (e: any) {
+              // If already started, ignore the error
+              if (e.name !== 'InvalidStateError' && !e.message?.includes('already started')) {
+                console.error('Error restarting recognition:', e);
               }
-            }, 1000);
+            }
           }
+        }, 1000);
+      }
         }
       };
 
       recognitionInstance.onend = () => {
         // Restart if still listening or auto-start is enabled
-        if ((isListening || autoStart) && recognitionInstance) {
+        if ((isListening || autoStart) && recognitionInstance && recognitionInstance.state !== 'running') {
           setTimeout(() => {
-            if (isListening || autoStart) {
+            if ((isListening || autoStart) && recognitionInstance.state !== 'running') {
               try {
                 recognitionInstance.start();
-              } catch (e) {
-                // Already started
+              } catch (e: any) {
+                // If already started, ignore the error
+                if (e.name !== 'InvalidStateError' && !e.message?.includes('already started')) {
+                  console.error('Error restarting recognition in onend:', e);
+                }
               }
             }
           }, 100);
@@ -177,8 +183,16 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
       setAutoStart(true);
       setIsListening(true);
       
-      if (recognition) {
-        recognition.start();
+      // Start recognition only if not already running
+      if (recognition && recognition.state !== 'running') {
+        try {
+          recognition.start();
+        } catch (e: any) {
+          // If already started, ignore the error
+          if (e.name !== 'InvalidStateError' && !e.message?.includes('already started')) {
+            console.error('Error starting recognition:', e);
+          }
+        }
       }
       
       speak('I am ready. I am listening continuously. Just speak naturally. Say "what do you see" to describe your surroundings, or "I am walking" to start navigation assistance.', 'high');
@@ -300,11 +314,14 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
       // Resume speech recognition after stopping (user might want to speak)
       if (recognition && (isListening || autoStart) && recognition.state !== 'running') {
         setTimeout(() => {
-          if (!isSpeakingRef.current && !shouldStopRef.current && (isListening || autoStart)) {
+          if (!isSpeakingRef.current && !shouldStopRef.current && (isListening || autoStart) && recognition.state !== 'running') {
             try {
               recognition.start();
-            } catch (e) {
-              // Ignore errors
+            } catch (e: any) {
+              // If already started, ignore the error
+              if (e.name !== 'InvalidStateError' && !e.message?.includes('already started')) {
+                console.error('Error starting recognition after stop:', e);
+              }
             }
           }
         }, 200);
@@ -546,25 +563,29 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
               
               // Resume speech recognition after speaking completes
               // But only if we're not in a sequence of items (wait for all items to finish)
-              if (isLastItem && (isListening || autoStart) && recognition && !shouldStopRef.current) {
+              if (isLastItem && (isListening || autoStart) && recognition && !shouldStopRef.current && recognition.state !== 'running') {
                 stateRef.current = 'LISTENING';
                 setTimeout(() => {
-                  if (!isSpeakingRef.current && !shouldStopRef.current && (isListening || autoStart) && !isUserSpeakingRef.current) {
+                  if (!isSpeakingRef.current && !shouldStopRef.current && (isListening || autoStart) && !isUserSpeakingRef.current && recognition.state !== 'running') {
                     try {
-                      if (recognition && recognition.state !== 'running') {
-                        recognition.start();
-                      }
-                    } catch (e) {
-                      // Already started or error - try again after a delay
-                      setTimeout(() => {
-                        if (recognition && recognition.state !== 'running' && !shouldStopRef.current && !isUserSpeakingRef.current) {
-                          try {
-                            recognition.start();
-                          } catch (e2) {
-                            // Ignore
+                      recognition.start();
+                    } catch (e: any) {
+                      // If already started, ignore the error
+                      if (e.name !== 'InvalidStateError' && !e.message?.includes('already started')) {
+                        // Try again after a delay
+                        setTimeout(() => {
+                          if (recognition && recognition.state !== 'running' && !shouldStopRef.current && !isUserSpeakingRef.current) {
+                            try {
+                              recognition.start();
+                            } catch (e2: any) {
+                              // If already started, ignore
+                              if (e2.name !== 'InvalidStateError' && !e2.message?.includes('already started')) {
+                                console.error('Error restarting recognition:', e2);
+                              }
+                            }
                           }
-                        }
-                      }, 1000); // Longer delay to avoid conflicts
+                        }, 1000); // Longer delay to avoid conflicts
+                      }
                     }
                   }
                 }, 1200); // Longer delay to ensure speech completes and avoid picking up echo
@@ -1526,11 +1547,15 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
       setIsListening(true);
       setAutoStart(true);
       
-      if (recognition) {
+      // Start recognition only if not already running
+      if (recognition && recognition.state !== 'running') {
         try {
           recognition.start();
-        } catch (e) {
-          // Already started
+        } catch (e: any) {
+          // If already started, ignore the error
+          if (e.name !== 'InvalidStateError' && !e.message?.includes('already started')) {
+            console.error('Error starting recognition:', e);
+          }
         }
       }
       
