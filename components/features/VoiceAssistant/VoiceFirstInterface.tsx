@@ -114,11 +114,13 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
       recognitionInstance.onerror = (event: any) => {
         const error = event.error;
         
-        // Ignore expected/benign errors
-        const expectedErrors = ['aborted', 'no-speech', 'audio-capture', 'network'];
-        if (expectedErrors.includes(error)) {
+        // Ignore expected/benign errors (case-insensitive check)
+        const errorLower = typeof error === 'string' ? error.toLowerCase() : String(error).toLowerCase();
+        const expectedErrors = ['aborted', 'no-speech', 'audio-capture', 'network', 'not-allowed', 'service-not-allowed'];
+        
+        if (expectedErrors.includes(errorLower)) {
           // Handle "no-speech" by restarting if still listening
-          if (error === 'no-speech') {
+          if (errorLower === 'no-speech') {
             if (isListening || autoStart) {
               setTimeout(() => {
                 if (recognitionInstance && (isListening || autoStart) && recognitionInstance.state !== 'running') {
@@ -134,7 +136,7 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
               }, 1000);
             }
           }
-          // For other expected errors (aborted, audio-capture, network), just ignore
+          // For other expected errors (aborted, audio-capture, network, etc.), just ignore silently
           return;
         }
         
