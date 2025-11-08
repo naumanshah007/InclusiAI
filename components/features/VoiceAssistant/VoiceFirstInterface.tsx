@@ -112,24 +112,34 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
       };
 
       recognitionInstance.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
-        if (event.error === 'no-speech') {
-      // Restart listening if no speech detected
-      if (isListening || autoStart) {
-        setTimeout(() => {
-          if (recognitionInstance && (isListening || autoStart) && recognitionInstance.state !== 'running') {
-            try {
-              recognitionInstance.start();
-            } catch (e: any) {
-              // If already started, ignore the error
-              if (e.name !== 'InvalidStateError' && !e.message?.includes('already started')) {
-                console.error('Error restarting recognition:', e);
-              }
+        const error = event.error;
+        
+        // Ignore expected/benign errors
+        const expectedErrors = ['aborted', 'no-speech', 'audio-capture', 'network'];
+        if (expectedErrors.includes(error)) {
+          // Handle "no-speech" by restarting if still listening
+          if (error === 'no-speech') {
+            if (isListening || autoStart) {
+              setTimeout(() => {
+                if (recognitionInstance && (isListening || autoStart) && recognitionInstance.state !== 'running') {
+                  try {
+                    recognitionInstance.start();
+                  } catch (e: any) {
+                    // If already started, ignore the error
+                    if (e.name !== 'InvalidStateError' && !e.message?.includes('already started')) {
+                      console.error('Error restarting recognition:', e);
+                    }
+                  }
+                }
+              }, 1000);
             }
           }
-        }, 1000);
-      }
+          // For other expected errors (aborted, audio-capture, network), just ignore
+          return;
         }
+        
+        // Only log actual unexpected errors
+        console.error('Speech recognition error:', error);
       };
 
       recognitionInstance.onend = () => {
