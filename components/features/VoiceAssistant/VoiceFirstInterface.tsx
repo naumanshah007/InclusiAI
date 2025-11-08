@@ -41,6 +41,10 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
   const shouldAutoContinueRef = useRef(false); // Flag to auto-continue after speaking all 5 items
   const itemsToSpeakRef = useRef<string[]>([]); // Track items to speak
   const currentItemIndexRef = useRef(0); // Track current item being spoken
+  const stateRef = useRef<'IDLE' | 'LISTENING' | 'PROCESSING' | 'SPEAKING' | 'PAUSED'>('IDLE'); // Clear state machine
+  const lastUserInputTimeRef = useRef(0); // Track when user last spoke
+  const autoContinueTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Track auto-continue timeout
+  const isUserSpeakingRef = useRef(false); // Track if user is currently speaking
 
   // Auto-start for blind users - initialize everything automatically
   useEffect(() => {
@@ -61,9 +65,20 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
       recognitionInstance.lang = 'en-US';
 
       recognitionInstance.onresult = async (event: SpeechRecognitionEvent) => {
+        // Mark that user is speaking
+        isUserSpeakingRef.current = true;
+        lastUserInputTimeRef.current = Date.now();
+        
+        // Cancel any pending auto-continue
+        if (autoContinueTimeoutRef.current) {
+          clearTimeout(autoContinueTimeoutRef.current);
+          autoContinueTimeoutRef.current = null;
+        }
+        
         // If assistant is speaking, stop it immediately when user speaks
-        if (isSpeakingRef.current) {
+        if (isSpeakingRef.current || stateRef.current === 'SPEAKING') {
           stopSpeaking();
+          stateRef.current = 'PAUSED';
         }
         
         // Get the latest result
@@ -76,23 +91,23 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
         
         if (transcript.trim()) {
           console.log('Voice command:', transcript);
+          // Update state
+          stateRef.current = 'PROCESSING';
+          
           // Pause recognition while processing command
           try {
             recognitionInstance.stop();
           } catch (e) {
             // Ignore errors
           }
+          
           await handleVoiceCommand(transcript.trim());
-          // Resume recognition after a brief delay
-          setTimeout(() => {
-            if ((isListening || autoStart) && !isSpeakingRef.current) {
-              try {
-                recognitionInstance.start();
-              } catch (e) {
-                // Already started or error
-              }
-            }
-          }, 500);
+          
+          // Mark user finished speaking
+          isUserSpeakingRef.current = false;
+          
+          // Resume recognition after processing completes (but wait for speech to finish)
+          // This will be handled in the speak function's onend callback
         }
       };
 
@@ -387,8 +402,8 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
   
   // Speak next item in the list sequentially
   const speakNextItem = (priority: 'high' | 'normal' = 'normal') => {
-    if (shouldStopRef.current) {
-      console.log('Stop flag active, stopping sequential speaking');
+    if (shouldStopRef.current || isUserSpeakingRef.current) {
+      console.log('Stop flag active or user speaking, stopping sequential speaking');
       return;
     }
     
@@ -396,21 +411,9 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
     const currentIndex = currentItemIndexRef.current;
     
     if (currentIndex >= items.length) {
-      // All items spoken - check if we should auto-continue
+      // All items spoken - auto-continue will be handled in utterance.onend
       console.log('All items spoken');
-      if (shouldAutoContinueRef.current && travelModeRef.current && !shouldStopRef.current) {
-        setTimeout(() => {
-          if (!shouldStopRef.current && travelModeRef.current) {
-            console.log('Auto-continuing to next analysis after all items spoken');
-            analyzeScene(
-              'List EXACTLY 5 most important things for navigation as a blind person is walking. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Focus on: 1) Immediate path ahead - clear/blocked/obstacle with distance, 2) People nearby - position and distance, 3) Steps/curbs/elevation changes - height and distance, 4) Doors/openings - open/closed and distance, 5) Hazards to avoid - location and distance. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.',
-              false,
-              'Navigation assistance - continuous guidance',
-              true
-            );
-          }
-        }, 1000); // Wait 1 second after all items are spoken
-      }
+      stateRef.current = 'IDLE';
       return;
     }
     
@@ -419,13 +422,15 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
     
     // Speak this item
     speakSingleItem(item, priority, false, () => {
-      // After this item is spoken, move to next
-      currentItemIndexRef.current++;
-      setTimeout(() => {
-        if (!shouldStopRef.current) {
-          speakNextItem(priority);
-        }
-      }, 500); // Small delay between items
+      // After this item is spoken, move to next (only if user hasn't interrupted)
+      if (!shouldStopRef.current && !isUserSpeakingRef.current) {
+        currentItemIndexRef.current++;
+        setTimeout(() => {
+          if (!shouldStopRef.current && !isUserSpeakingRef.current) {
+            speakNextItem(priority);
+          }
+        }, 600); // Slightly longer delay between items for clarity
+      }
     });
   };
   
@@ -501,26 +506,50 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
                 onComplete();
               }
               
-              // If auto-continue is enabled, trigger next analysis after a short delay
-              if (autoContinue && shouldAutoContinueRef.current && !shouldStopRef.current && travelModeRef.current) {
-                setTimeout(() => {
-                  if (!shouldStopRef.current && travelModeRef.current) {
-                    console.log('Auto-continuing to next analysis after speaking');
-                    // Trigger next analysis in continuous mode
-                    analyzeScene(
-                      'List EXACTLY 5 most important things for navigation as a blind person is walking. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Focus on: 1) Immediate path ahead - clear/blocked/obstacle with distance, 2) People nearby - position and distance, 3) Steps/curbs/elevation changes - height and distance, 4) Doors/openings - open/closed and distance, 5) Hazards to avoid - location and distance. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.',
-                      false,
-                      'Navigation assistance - continuous guidance',
-                      true
-                    );
+              // Check if this was the last item in a sequence
+              const items = itemsToSpeakRef.current;
+              const currentIndex = currentItemIndexRef.current;
+              const isLastItem = currentIndex >= items.length;
+              
+              // If auto-continue is enabled and this is the last item, schedule next analysis
+              // But only if user hasn't spoken recently (2 seconds grace period)
+              if (isLastItem && shouldAutoContinueRef.current && !shouldStopRef.current && travelModeRef.current) {
+                const timeSinceUserInput = Date.now() - lastUserInputTimeRef.current;
+                const gracePeriod = 2000; // 2 seconds
+                
+                if (timeSinceUserInput > gracePeriod && !isUserSpeakingRef.current) {
+                  // Clear any existing timeout
+                  if (autoContinueTimeoutRef.current) {
+                    clearTimeout(autoContinueTimeoutRef.current);
                   }
-                }, 1000); // Wait 1 second after speaking completes
+                  
+                  // Schedule auto-continue after a delay
+                  autoContinueTimeoutRef.current = setTimeout(() => {
+                    if (!shouldStopRef.current && travelModeRef.current && !isUserSpeakingRef.current) {
+                      const timeSinceLastInput = Date.now() - lastUserInputTimeRef.current;
+                      // Only continue if user hasn't spoken in the last 2 seconds
+                      if (timeSinceLastInput > gracePeriod) {
+                        console.log('Auto-continuing to next analysis after all items spoken');
+                        stateRef.current = 'PROCESSING';
+                        analyzeScene(
+                          'List EXACTLY 5 most important things for navigation as a blind person is walking. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Focus on: 1) Immediate path ahead - clear/blocked/obstacle with distance, 2) People nearby - position and distance, 3) Steps/curbs/elevation changes - height and distance, 4) Doors/openings - open/closed and distance, 5) Hazards to avoid - location and distance. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.',
+                          false,
+                          'Navigation assistance - continuous guidance',
+                          true
+                        );
+                      }
+                    }
+                    autoContinueTimeoutRef.current = null;
+                  }, 1500); // Wait 1.5 seconds after last item is spoken
+                }
               }
               
               // Resume speech recognition after speaking completes
-              if ((isListening || autoStart) && recognition && !shouldStopRef.current) {
+              // But only if we're not in a sequence of items (wait for all items to finish)
+              if (isLastItem && (isListening || autoStart) && recognition && !shouldStopRef.current) {
+                stateRef.current = 'LISTENING';
                 setTimeout(() => {
-                  if (!isSpeakingRef.current && !shouldStopRef.current && (isListening || autoStart)) {
+                  if (!isSpeakingRef.current && !shouldStopRef.current && (isListening || autoStart) && !isUserSpeakingRef.current) {
                     try {
                       if (recognition && recognition.state !== 'running') {
                         recognition.start();
@@ -528,17 +557,17 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
                     } catch (e) {
                       // Already started or error - try again after a delay
                       setTimeout(() => {
-                        if (recognition && recognition.state !== 'running' && !shouldStopRef.current) {
+                        if (recognition && recognition.state !== 'running' && !shouldStopRef.current && !isUserSpeakingRef.current) {
                           try {
                             recognition.start();
                           } catch (e2) {
                             // Ignore
                           }
                         }
-                      }, 500);
+                      }, 1000); // Longer delay to avoid conflicts
                     }
                   }
-                }, 800); // Delay to ensure speech completes
+                }, 1200); // Longer delay to ensure speech completes and avoid picking up echo
               }
             };
             
@@ -547,9 +576,20 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
               if (shouldStopRef.current) {
                 synth.cancel();
                 isSpeakingRef.current = false;
+                stateRef.current = 'PAUSED';
                 return;
               }
               isSpeakingRef.current = true;
+              stateRef.current = 'SPEAKING';
+              
+              // Ensure recognition is stopped while speaking
+              if (recognition && recognition.state === 'running') {
+                try {
+                  recognition.stop();
+                } catch (e) {
+                  // Ignore errors
+                }
+              }
             };
             
             // Final check before speaking
@@ -808,11 +848,17 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
           return description;
         }
         
-        if (!silent && !shouldStopRef.current) {
+        if (!silent && !shouldStopRef.current && !isUserSpeakingRef.current) {
           // Stop any ongoing speech before speaking new description
           stopSpeaking();
           // Reset stop flag to allow new speech
           shouldStopRef.current = false;
+          
+          // Cancel any pending auto-continue (we're starting a new one)
+          if (autoContinueTimeoutRef.current) {
+            clearTimeout(autoContinueTimeoutRef.current);
+            autoContinueTimeoutRef.current = null;
+          }
           
           // Pause speech recognition while speaking (prevents interference)
           if (recognition && recognition.state === 'running') {
@@ -825,14 +871,14 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
           
           // Small delay to ensure stop flag is reset and recognition is paused
           setTimeout(() => {
-            // Check stop flag again before speaking
-            if (!shouldStopRef.current && description) {
+            // Check stop flag and user speaking status again before speaking
+            if (!shouldStopRef.current && !isUserSpeakingRef.current && description) {
               console.log('Auto-speaking description:', description.substring(0, 50) + '...');
               // Enable auto-continue for travel mode
               const shouldAutoContinue = travelModeRef.current && quickMode;
               speak(description, 'high', shouldAutoContinue);
             }
-          }, 100);
+          }, 200); // Slightly longer delay for better coordination
         }
         
         return description;
@@ -1351,6 +1397,7 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
   };
 
   // Start continuous analysis for travel mode
+  // NOTE: This is now a backup - auto-continue handles most updates
   const startContinuousAnalysis = () => {
     // Clear any existing interval
     if (intervalRef.current) {
@@ -1358,10 +1405,11 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
       intervalRef.current = null;
     }
 
-    console.log('Starting continuous analysis for travel mode');
+    console.log('Starting continuous analysis for travel mode (backup interval)');
     
     let analysisCount = 0;
     
+    // Use longer interval since auto-continue handles most updates
     intervalRef.current = setInterval(async () => {
       // Use ref to check travel mode status and stop flag (avoids closure issues)
       if (!travelModeRef.current || shouldStopRef.current) {
@@ -1381,16 +1429,30 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
         return;
       }
       
+      // Don't run if user is speaking or assistant is speaking
+      if (isUserSpeakingRef.current || isSpeakingRef.current || stateRef.current === 'SPEAKING') {
+        console.log('User or assistant speaking, skipping interval analysis');
+        return;
+      }
+      
+      // Don't run if there's a pending auto-continue
+      if (autoContinueTimeoutRef.current) {
+        console.log('Auto-continue pending, skipping interval analysis');
+        return;
+      }
+      
       analysisCount++;
       analysisCountRef.current = analysisCount;
-      console.log(`Travel mode analysis #${analysisCount}`);
+      console.log(`Travel mode backup analysis #${analysisCount}`);
 
       try {
         // Check stop flag before starting analysis
-        if (shouldStopRef.current || !travelModeRef.current) {
-          console.log('Stop flag active or travel mode inactive, skipping analysis');
+        if (shouldStopRef.current || !travelModeRef.current || isUserSpeakingRef.current) {
+          console.log('Stop flag active or user speaking, skipping analysis');
           return;
         }
+        
+        stateRef.current = 'PROCESSING';
         
         // Use quick mode for travel mode - EXACTLY 5 items, concise updates
         // Note: analyzeScene will automatically enable auto-continue for travel mode
@@ -1418,10 +1480,11 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
         }
       } catch (error) {
         console.error('Error in continuous analysis:', error);
+        stateRef.current = 'IDLE';
       }
-    }, 10000); // Analyze every 10 seconds for continuous updates
+    }, 15000); // Longer interval (15 seconds) since auto-continue handles most updates
     
-    console.log('Continuous analysis interval started');
+    console.log('Continuous analysis interval started (backup mode)');
   };
 
   const stopContinuousAnalysis = () => {
@@ -1485,6 +1548,7 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
     
     // Set global stop flag FIRST - prevents any new operations
     shouldStopRef.current = true;
+    stateRef.current = 'PAUSED';
     
     // Stop all speech immediately (synchronous, no delays)
     stopSpeaking();
@@ -1492,6 +1556,12 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
     // Cancel all ongoing analysis
     currentAnalysisRef.current = null;
     setIsProcessing(false);
+    
+    // Cancel auto-continue timeout
+    if (autoContinueTimeoutRef.current) {
+      clearTimeout(autoContinueTimeoutRef.current);
+      autoContinueTimeoutRef.current = null;
+    }
     
     // Stop continuous analysis
     stopContinuousAnalysis();
@@ -1506,6 +1576,12 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
       clearTimeout(timeout);
     });
     pendingTimeoutsRef.current = [];
+    
+    // Reset speaking state
+    isUserSpeakingRef.current = false;
+    itemsToSpeakRef.current = [];
+    currentItemIndexRef.current = 0;
+    shouldAutoContinueRef.current = false;
     
     // Stop speech recognition
     if (recognition) {
@@ -1542,6 +1618,7 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
     // Reset stop flag after a brief moment (allows for restart)
     setTimeout(() => {
       shouldStopRef.current = false;
+      stateRef.current = 'IDLE';
     }, 100);
   };
 
