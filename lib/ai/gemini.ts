@@ -148,15 +148,15 @@ Be specific about locations and relationships.`,
   * Whether colors match or complement each other
   * If the outfit appears formal, casual, or business-appropriate
   * Color coordination suggestions`,
-        general: `Describe this image concisely for a visually impaired person. List the TOP 3-5 most important things. Be very brief - each item should be 5-10 words max. Focus on: 1) Main objects or people, 2) Their positions (left/right/center/ahead), 3) Important text if visible, 4) Any obstacles or notable features. Format as a numbered list.`,
+        general: `List EXACTLY 5 most important things in this image for a visually impaired person. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Focus on: 1) Main objects or people, 2) Their positions (left/right/center/ahead), 3) Important text if visible, 4) Any obstacles or notable features, 5) Distance or spatial relationships. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.`,
       };
 
       const basePrompt = scenario && scenarioPrompts[scenario]
         ? scenarioPrompts[scenario]
         : context
-        ? (context.toLowerCase().includes('top 3') || context.toLowerCase().includes('top 5') || context.toLowerCase().includes('brief') || context.toLowerCase().includes('concise'))
-          ? `List the TOP 3-5 most important things in this image. Be very brief - each item should be 5-10 words max. Context: ${context}. Format as a numbered list.`
-          : `Describe this image concisely for a visually impaired person. Context: ${context}. List the TOP 3-5 most important things. Be brief - each item 5-10 words max.`
+        ? (context.toLowerCase().includes('top 3') || context.toLowerCase().includes('top 5') || context.toLowerCase().includes('brief') || context.toLowerCase().includes('concise') || context.toLowerCase().includes('list'))
+          ? `List EXACTLY 5 most important things in this image. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Context: ${context}. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.`
+          : `List EXACTLY 5 most important things in this image. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Context: ${context}. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.`
         : scenarioPrompts.general;
 
       // Convert base64 to image part for multimodal input

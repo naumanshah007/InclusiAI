@@ -38,6 +38,9 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
   const shouldStopRef = useRef(false); // Global flag to prevent new speech/analysis
   const speechQueueRef = useRef<SpeechSynthesisUtterance[]>([]); // Track all utterances
   const pendingTimeoutsRef = useRef<NodeJS.Timeout[]>([]); // Track all timeouts
+  const shouldAutoContinueRef = useRef(false); // Flag to auto-continue after speaking all 5 items
+  const itemsToSpeakRef = useRef<string[]>([]); // Track items to speak
+  const currentItemIndexRef = useRef(0); // Track current item being spoken
 
   // Auto-start for blind users - initialize everything automatically
   useEffect(() => {
@@ -324,16 +327,114 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
     }
   };
 
+  // Parse numbered list and extract all items
+  const parseNumberedList = (text: string): string[] => {
+    // Try to extract numbered items (1., 2., 3., etc.)
+    const items: string[] = [];
+    const lines = text.split('\n');
+    
+    for (const line of lines) {
+      // Match patterns like "1. item", "1) item", "1 - item", etc.
+      const match = line.match(/^\s*(\d+)\.?\s*[)\-]?\s*(.+)$/);
+      if (match) {
+        const itemText = match[2].trim();
+        if (itemText) {
+          items.push(itemText);
+        }
+      }
+    }
+    
+    // If we found items, return them; otherwise return the original text as a single item
+    if (items.length > 0) {
+      return items;
+    }
+    
+    // Fallback: try to split by common separators
+    const fallbackItems = text.split(/[\.;]\s+/).filter(item => item.trim().length > 0);
+    if (fallbackItems.length > 0) {
+      return fallbackItems;
+    }
+    
+    // Last resort: return as single item
+    return [text];
+  };
+
   // Speak text using Web Speech API - with stop flag check
-  const speak = (text: string, priority: 'high' | 'normal' = 'normal') => {
+  // If text contains numbered list, speak all items sequentially
+  const speak = (text: string, priority: 'high' | 'normal' = 'normal', autoContinue: boolean = false) => {
     // CRITICAL: Check stop flag first - don't speak if stopped
     if (shouldStopRef.current) {
       console.log('Stop flag active, not speaking');
       return;
     }
     
+    // Parse numbered list
+    const items = parseNumberedList(text);
+    console.log('Parsed items:', items.length, items);
+    
+    // If we have multiple items (numbered list), speak them sequentially
+    if (items.length > 1) {
+      shouldAutoContinueRef.current = autoContinue;
+      itemsToSpeakRef.current = items;
+      currentItemIndexRef.current = 0;
+      speakNextItem(priority);
+      return;
+    }
+    
+    // Single item or non-numbered text - speak normally
+    speakSingleItem(text, priority, autoContinue);
+  };
+  
+  // Speak next item in the list sequentially
+  const speakNextItem = (priority: 'high' | 'normal' = 'normal') => {
+    if (shouldStopRef.current) {
+      console.log('Stop flag active, stopping sequential speaking');
+      return;
+    }
+    
+    const items = itemsToSpeakRef.current;
+    const currentIndex = currentItemIndexRef.current;
+    
+    if (currentIndex >= items.length) {
+      // All items spoken - check if we should auto-continue
+      console.log('All items spoken');
+      if (shouldAutoContinueRef.current && travelModeRef.current && !shouldStopRef.current) {
+        setTimeout(() => {
+          if (!shouldStopRef.current && travelModeRef.current) {
+            console.log('Auto-continuing to next analysis after all items spoken');
+            analyzeScene(
+              'List EXACTLY 5 most important things for navigation as a blind person is walking. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Focus on: 1) Immediate path ahead - clear/blocked/obstacle with distance, 2) People nearby - position and distance, 3) Steps/curbs/elevation changes - height and distance, 4) Doors/openings - open/closed and distance, 5) Hazards to avoid - location and distance. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.',
+              false,
+              'Navigation assistance - continuous guidance',
+              true
+            );
+          }
+        }, 1000); // Wait 1 second after all items are spoken
+      }
+      return;
+    }
+    
+    const item = items[currentIndex];
+    console.log(`Speaking item ${currentIndex + 1} of ${items.length}:`, item);
+    
+    // Speak this item
+    speakSingleItem(item, priority, false, () => {
+      // After this item is spoken, move to next
+      currentItemIndexRef.current++;
+      setTimeout(() => {
+        if (!shouldStopRef.current) {
+          speakNextItem(priority);
+        }
+      }, 500); // Small delay between items
+    });
+  };
+  
+  // Speak a single item
+  const speakSingleItem = (text: string, priority: 'high' | 'normal' = 'normal', autoContinue: boolean = false, onComplete?: () => void) => {
+    
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       console.warn('Speech synthesis not available');
+      if (onComplete) onComplete();
       return;
     }
 
@@ -394,6 +495,27 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
               // Remove from queue
               speechQueueRef.current = speechQueueRef.current.filter(u => u !== utterance);
               isSpeakingRef.current = false;
+              
+              // Call onComplete callback if provided
+              if (onComplete) {
+                onComplete();
+              }
+              
+              // If auto-continue is enabled, trigger next analysis after a short delay
+              if (autoContinue && shouldAutoContinueRef.current && !shouldStopRef.current && travelModeRef.current) {
+                setTimeout(() => {
+                  if (!shouldStopRef.current && travelModeRef.current) {
+                    console.log('Auto-continuing to next analysis after speaking');
+                    // Trigger next analysis in continuous mode
+                    analyzeScene(
+                      'List EXACTLY 5 most important things for navigation as a blind person is walking. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Focus on: 1) Immediate path ahead - clear/blocked/obstacle with distance, 2) People nearby - position and distance, 3) Steps/curbs/elevation changes - height and distance, 4) Doors/openings - open/closed and distance, 5) Hazards to avoid - location and distance. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.',
+                      false,
+                      'Navigation assistance - continuous guidance',
+                      true
+                    );
+                  }
+                }, 1000); // Wait 1 second after speaking completes
+              }
               
               // Resume speech recognition after speaking completes
               if ((isListening || autoStart) && recognition && !shouldStopRef.current) {
@@ -621,8 +743,8 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
         let enhancedContext: string;
         
         if (quickMode) {
-          // Quick mode: concise, actionable updates
-          enhancedContext = context || 'List the TOP 3-5 most important things in this scene for a blind person walking. Format as a numbered list. Be very brief and actionable. Focus on: 1) Immediate obstacles or hazards, 2) People nearby and their position, 3) Path ahead (clear/blocked), 4) Important objects or text. Keep each item to 5-10 words max. Example: "1. Clear path ahead for 10 feet. 2. Person on left, 5 feet away. 3. Door ahead, appears open."';
+          // Quick mode: EXACTLY 5 items, concise and actionable
+          enhancedContext = context || 'List EXACTLY 5 most important things in this scene for a blind person walking. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Focus on: 1) Immediate obstacles or hazards, 2) People nearby and their position, 3) Path ahead (clear/blocked), 4) Important objects or text, 5) Distance or spatial relationships. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly. Example: "1. Clear path ahead for 10 feet. 2. Person on left, 5 feet away. 3. Door ahead, appears open. 4. Sign on right says Exit. 5. Step down 6 inches, 8 feet ahead."';
         } else {
           // Detailed mode: full description
           enhancedContext = context || 'Describe this scene in detail for a blind person. Include obstacles, people, objects, text, and spatial relationships. Be specific about locations (left, right, center, distance).';
@@ -706,7 +828,9 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
             // Check stop flag again before speaking
             if (!shouldStopRef.current && description) {
               console.log('Auto-speaking description:', description.substring(0, 50) + '...');
-              speak(description, 'high');
+              // Enable auto-continue for travel mode
+              const shouldAutoContinue = travelModeRef.current && quickMode;
+              speak(description, 'high', shouldAutoContinue);
             }
           }, 100);
         }
@@ -802,7 +926,7 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
         // Do immediate first analysis
         setTimeout(async () => {
           const description = await analyzeScene(
-            'List the TOP 3-5 most important things for navigation. Format as a numbered list. Be very brief and actionable. Focus on: 1) Path ahead - clear/blocked with distance, 2) Obstacles/steps/curbs - location and distance, 3) People nearby - position and distance, 4) Doors/openings - state and distance, 5) Hazards - location and distance. Keep each item to 5-10 words max.',
+            'List EXACTLY 5 most important things for navigation. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Focus on: 1) Path ahead - clear/blocked with distance, 2) Obstacles/steps/curbs - location and distance, 3) People nearby - position and distance, 4) Doors/openings - state and distance, 5) Hazards - location and distance. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.',
             false,
             'Navigation assistance - initial scan',
             true // Use quick mode
@@ -837,7 +961,7 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
             lowerCommand.includes('tell me what you see') ||
             (lowerCommand.includes('what') && lowerCommand.includes('see'))) {
           const description = await analyzeScene(
-            'List the TOP 3-5 most important things in this scene for a blind person. Format as a numbered list. Be very brief and actionable. Focus on: 1) Immediate obstacles or hazards, 2) People nearby and their position, 3) Path ahead (clear/blocked), 4) Important objects or text. Keep each item to 5-10 words max.',
+            'List EXACTLY 5 most important things in this scene for a blind person. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Focus on: 1) Immediate obstacles or hazards, 2) People nearby and their position, 3) Path ahead (clear/blocked), 4) Important objects or text, 5) Distance or spatial relationships. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.',
             false,
             command,
             true // Use quick mode for concise updates
@@ -938,7 +1062,7 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
         lowerCommand.includes('anything blocking') ||
         lowerCommand.includes('is it safe')) {
       const description = await analyzeScene(
-        'List the TOP 3-5 obstacles, hazards, or dangers in this scene. Format as a numbered list. Be very brief. For each item, describe location and how to avoid. If the path is clear, say "Path is clear". Keep each item to 5-10 words max.',
+        'List EXACTLY 5 obstacles, hazards, or dangers in this scene. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. For each item, describe location and how to avoid. If the path is clear, say "1. Path is clear" and list 4 other observations. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.',
         false,
         command,
         true // Use quick mode
@@ -955,7 +1079,7 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
         lowerCommand.includes('right') ||
         lowerCommand.includes('straight')) {
       const description = await analyzeScene(
-        'List the TOP 3-5 navigation instructions. Format as a numbered list. Be very brief and actionable. Focus on: 1) Next turn - direction and distance, 2) Doors/openings - state and distance, 3) Stairs/steps - direction and distance, 4) Landmarks - location and distance, 5) Distance to next action. Keep each item to 5-10 words max.',
+        'List EXACTLY 5 navigation instructions. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Focus on: 1) Next turn - direction and distance, 2) Doors/openings - state and distance, 3) Stairs/steps - direction and distance, 4) Landmarks - location and distance, 5) Distance to next action. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.',
         false,
         command,
         true // Use quick mode
@@ -971,7 +1095,7 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
         lowerCommand.includes('who is') ||
         lowerCommand.includes('who are')) {
       const description = await analyzeScene(
-        'List the TOP 3-5 people in this scene. Format as a numbered list. Be very brief. For each person: location, distance, and position. If no people visible, say "No people visible". Keep each item to 5-10 words max.',
+        'List EXACTLY 5 people in this scene. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. For each person: location, distance, and position. If no people visible, say "1. No people visible" and list 4 other observations. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly.',
         false,
         command,
         true // Use quick mode
@@ -1173,7 +1297,7 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
         lowerCommand.includes('describe the image') ||
         (lowerCommand.includes('describe') && lowerCommand.includes('image'))) {
       const description = await analyzeScene(
-        'List the TOP 3-5 most important things in this image. Be very brief - each item should be 5-10 words max. Format as a numbered list. Focus on: 1) Main objects or people, 2) Their positions (left/right/center), 3) Important text if visible, 4) Any obstacles or notable features. Example: "1. Person on left, 5 feet away. 2. Door ahead, appears open. 3. Sign on right says Exit."',
+        'List EXACTLY 5 most important things in this image. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Focus on: 1) Main objects or people, 2) Their positions (left/right/center), 3) Important text if visible, 4) Any obstacles or notable features, 5) Distance or spatial relationships. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly. Example: "1. Person on left, 5 feet away. 2. Door ahead, appears open. 3. Sign on right says Exit. 4. Step down 6 inches ahead. 5. Wall on right, 3 feet away."',
         false,
         command,
         true // Use quick mode for concise updates
@@ -1268,12 +1392,13 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
           return;
         }
         
-        // Use quick mode for travel mode - top 3-5 items, concise updates
+        // Use quick mode for travel mode - EXACTLY 5 items, concise updates
+        // Note: analyzeScene will automatically enable auto-continue for travel mode
         const description = await analyzeScene(
-          'List the TOP 3-5 most important things for navigation as a blind person is walking. Format as a numbered list. Be very brief and actionable. Focus on: 1) Immediate path ahead - clear/blocked/obstacle with distance, 2) People nearby - position and distance, 3) Steps/curbs/elevation changes - height and distance, 4) Doors/openings - open/closed and distance, 5) Hazards to avoid - location and distance. Keep each item to 5-10 words max. Example: "1. Clear path ahead for 10 feet. 2. Person on left, 5 feet away. 3. Step down 6 inches, 8 feet ahead."',
+          'List EXACTLY 5 most important things for navigation as a blind person is walking. Format as a numbered list: "1. [item]. 2. [item]. 3. [item]. 4. [item]. 5. [item]." Each item must be 5-10 words max. Focus on: 1) Immediate path ahead - clear/blocked/obstacle with distance, 2) People nearby - position and distance, 3) Steps/curbs/elevation changes - height and distance, 4) Doors/openings - open/closed and distance, 5) Hazards to avoid - location and distance. Do NOT say "top 5" or "here are 5 things" - just list the 5 numbered items directly. Example: "1. Clear path ahead for 10 feet. 2. Person on left, 5 feet away. 3. Step down 6 inches, 8 feet ahead. 4. Door on right, appears closed. 5. Sign ahead says Stop."',
           false, // Always speak in travel mode
           'Navigation assistance - continuous guidance',
-          true // Use quick mode for concise updates
+          true // Use quick mode for concise updates - this enables auto-continue
         );
         
         // Check if travel mode is still active and stop flag after analysis
