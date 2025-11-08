@@ -604,7 +604,10 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
     }
 
     // Create a promise for this analysis
-    const analysisPromise = (async () => {
+    let analysisPromise: Promise<string>;
+    const promiseRef = { current: null as Promise<string> | null };
+    
+    analysisPromise = (async () => {
       try {
         setIsProcessing(true);
         console.log('Analyzing scene with context:', context?.substring(0, 50));
@@ -678,7 +681,7 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
         }
         
         // Check if this analysis was canceled (new one started or stop flag)
-        if (currentAnalysisRef.current !== analysisPromise || shouldStopRef.current) {
+        if (currentAnalysisRef.current !== promiseRef.current || shouldStopRef.current) {
           console.log('Analysis was canceled, not speaking');
           return description;
         }
@@ -712,19 +715,20 @@ export function VoiceFirstInterface({ onStart, onStop }: VoiceFirstInterfaceProp
       } catch (error) {
         console.error('Error analyzing scene:', error);
         const errorMsg = 'Failed to analyze scene. Please try again.';
-        if (!silent && currentAnalysisRef.current === analysisPromise) {
+        if (!silent && currentAnalysisRef.current === promiseRef.current) {
           stopSpeaking();
           speak(errorMsg, 'high');
         }
         return errorMsg;
       } finally {
-        if (currentAnalysisRef.current === analysisPromise) {
+        if (currentAnalysisRef.current === promiseRef.current) {
           setIsProcessing(false);
           currentAnalysisRef.current = null;
         }
       }
     })();
     
+    promiseRef.current = analysisPromise;
     currentAnalysisRef.current = analysisPromise;
     return analysisPromise;
   };

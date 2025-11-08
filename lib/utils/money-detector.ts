@@ -68,7 +68,7 @@ Details: [additional details]`;
         info.denomination = line.replace(/^denomination:\s*/i, '').trim();
       } else if (lowerLine.startsWith('side:')) {
         const side = line.replace(/^side:\s*/i, '').trim().toLowerCase();
-        info.side = side.includes('front') ? 'front' : side.includes('back') ? 'back' : 'unknown';
+        info.side = side.includes('front') ? 'front' : side.includes('back') ? 'back' : undefined;
         info.orientation = info.side;
       }
     }

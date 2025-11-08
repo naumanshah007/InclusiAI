@@ -67,7 +67,7 @@ export function parseFormInfo(aiResponse: string): FormInfo {
       };
       
       // Detect field type
-      const labelLower = currentField.label.toLowerCase();
+      const labelLower = currentField.label?.toLowerCase() || '';
       if (labelLower.includes('email')) {
         currentField.type = 'email';
       } else if (labelLower.includes('phone') || labelLower.includes('tel')) {

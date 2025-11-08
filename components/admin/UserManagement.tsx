@@ -104,7 +104,14 @@ export function UserManagement() {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setSelectedUser(user as User)}
+                        onClick={() => setSelectedUser({
+                          id: user.userId,
+                          email: user.email,
+                          name: user.name,
+                          profileId: user.profileId,
+                          role: user.role,
+                          createdAt: user.createdAt,
+                        })}
                         className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
                       >
                         Edit

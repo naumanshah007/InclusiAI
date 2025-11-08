@@ -6,6 +6,7 @@ interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
+  state?: 'idle' | 'running' | 'listening' | 'stopping';
   start(): void;
   stop(): void;
   abort(): void;

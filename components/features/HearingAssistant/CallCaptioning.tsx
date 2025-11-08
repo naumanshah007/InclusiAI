@@ -3,14 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useCaptionStore } from '@/lib/store/caption-store';
 
-// Fix for SpeechRecognition type
-declare global {
-  interface Window {
-    webkitSpeechRecognition: any;
-    SpeechRecognition: any;
-  }
-}
-
 export function CallCaptioning() {
   const [isActive, setIsActive] = useState(false);
   const [transcript, setTranscript] = useState('');

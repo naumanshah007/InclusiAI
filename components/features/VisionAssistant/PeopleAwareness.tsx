@@ -98,7 +98,6 @@ Be specific about location and distance. If no people are visible, say "No peopl
       name: personName.trim(),
       description: personInfo || 'Trusted person',
       image: currentImage,
-      timestamp: Date.now(),
     });
 
     // Speak confirmation

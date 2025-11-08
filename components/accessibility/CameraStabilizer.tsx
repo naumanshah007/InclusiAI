@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { analyzeImageQuality, getImageQualityGuidance, type ImageQualityMetrics } from '@/lib/utils/image-quality';
 
 interface CameraStabilizerProps {
-  videoRef: React.RefObject<HTMLVideoElement>;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
   onQualityChange?: (metrics: ImageQualityMetrics) => void;
   onGuidanceChange?: (guidance: string | null) => void;
   enabled?: boolean;

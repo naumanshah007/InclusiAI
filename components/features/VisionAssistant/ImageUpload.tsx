@@ -16,7 +16,7 @@ export function ImageUpload({ onImageSelect }: ImageUploadProps) {
     setError(null);
 
     // Validate file type
-    if (!SUPPORTED_FILE_TYPES.IMAGE.includes(file.type)) {
+    if (!(SUPPORTED_FILE_TYPES.IMAGE as readonly string[]).includes(file.type)) {
       setError(
         `Unsupported file type. Please use: ${SUPPORTED_FILE_TYPES.IMAGE.join(
           ', '
